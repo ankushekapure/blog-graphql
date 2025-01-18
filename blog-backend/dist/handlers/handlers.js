@@ -220,22 +220,38 @@ const mutations = new graphql_1.GraphQLObjectType({
         deleteComment: {
             type: schema_1.commentType,
             args: {
-                commentId: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLID) },
+                id: { type: new graphql_1.GraphQLNonNull(graphql_1.GraphQLID) },
             },
-            async resolve(parent, { commentId }) {
+            async resolve(parent, { id }) {
                 const session = await (0, mongoose_1.startSession)();
                 session.startTransaction({ session });
                 try {
                     let existingComment;
-                    existingComment = await Comment_1.default.findById(commentId);
+                    existingComment = await Comment_1.default.findById(id);
+                    //@ts-ignore
+                    const existingUser = await User_1.default.findById(existingComment?.user);
                     if (!existingComment)
                         return new Error("Comment Does not Exist");
-                    return await existingComment.deleteOne();
+                    if (!existingUser)
+                        return new Error("User Does not Exist");
+                    //@ts-ignore
+                    const existingBlog = await Blog_1.default.findById(existingComment?.blog);
+                    if (!existingBlog)
+                        return new Error("Blog Does not Exist");
+                    // @ts-ignore
+                    existingUser.comments.pull(existingComment);
+                    // @ts-ignore
+                    existingBlog.comments.pull(existingComment);
+                    await existingBlog.save({ session });
+                    await existingUser.save({ session });
+                    await existingComment.deleteOne({ session });
+                    return existingComment;
                 }
                 catch (error) {
+                    return new Error(error);
                 }
                 finally {
-                    session.commitTransaction();
+                    await session.commitTransaction();
                 }
             },
         },

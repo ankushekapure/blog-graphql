@@ -230,19 +230,35 @@ const mutations = new GraphQLObjectType({
     deleteComment: {
       type: commentType,
       args: {
-        commentId: { type: new GraphQLNonNull(GraphQLID) },
+        id: { type: new GraphQLNonNull(GraphQLID) },
       },
-      async resolve(parent, { commentId }) {
+      async resolve(parent, { id }) {
         const session = await startSession();
         session.startTransaction({ session });
         try {
-          let existingComment;
-          existingComment = await Comment.findById(commentId);
+          let existingComment: DocumentType;
+          existingComment = await Comment.findById(id);
+          //@ts-ignore
+          const existingUser = await User.findById(existingComment?.user);
+
           if (!existingComment) return new Error("Comment Does not Exist");
-          return await existingComment.deleteOne();
+          if (!existingUser) return new Error("User Does not Exist");
+          //@ts-ignore
+          const existingBlog = await Blog.findById(existingComment?.blog);
+          if (!existingBlog) return new Error("Blog Does not Exist");
+          // @ts-ignore
+          existingUser.comments.pull(existingComment);
+          // @ts-ignore
+          existingBlog.comments.pull(existingComment);
+
+          await existingBlog.save({ session });
+          await existingUser.save({ session });
+          await existingComment.deleteOne({ session });
+          return existingComment;
         } catch (error) {
+          return new Error(error);
         } finally {
-          session.commitTransaction();
+          await session.commitTransaction();
         }
       },
     },

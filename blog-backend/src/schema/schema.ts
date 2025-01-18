@@ -64,6 +64,8 @@ export const commentType = new GraphQLObjectType({
     user: {
       type: userType,
       async resolve(parent) {
+        console.log(parent.user);
+
         return await User.findById(parent.user);
       },
     },

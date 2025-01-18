@@ -60,6 +60,7 @@ exports.commentType = new graphql_1.GraphQLObjectType({
         user: {
             type: exports.userType,
             async resolve(parent) {
+                console.log(parent.user);
                 return await User_1.default.findById(parent.user);
             },
         },
